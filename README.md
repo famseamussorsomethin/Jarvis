@@ -16,7 +16,8 @@ I use Qwen3-1.7b just because it is simple, fast, and still a reasoning model wi
 
 #
 
-##### I saw another credit by the name @llm.guy (on tiktok) do the same thing, except his is very well made and hes been doing this for almost a full month. I made my old one that I mentioned earlier BEFORE I saw his video which is a funny coincidence but yeah he is cool give his videos a watch (his is also open sourced on github @llm-guy)
+##### I saw another creator by the name llmguy (on tiktok) do the same thing, except his is very well made and hes been doing this for almost a full month. I made my old one that I mentioned earlier BEFORE I saw his video which is a funny coincidence but yeah he is cool give his videos a watch.
+#### (GitHub username is @llm-guy, TikTok username is @llm.guy)
 
 
 #
