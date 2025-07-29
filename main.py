@@ -34,8 +34,11 @@ toolcalls = [
 ]
 
 def runcmd(command):
-    subprocess.run(command, shell=True)
-    return "success"
+    result = subprocess.run(command, shell=True)
+    if result.returncode == 0: # checks to see if its true so that i dont return a false thing to jarvis. this is so the user will correctly know if it fails or not from jarvis.
+        return "success" 
+    else:
+        return "failed"
 def sendchat(history):
     return requests.post(api, json={
             "model": identifier,
@@ -58,7 +61,12 @@ def main():
             history.append({"role": "assistant", "content": content})
             coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
             coloredfullresponse += "\033[0m" # sets it back to white
-            #print(coloredfullresponse) uncommenting this just makes it so it prints the thought process no matter if there was a tool call or not. good for debugging.
+
+
+            #print(coloredfullresponse) 
+            # uncommenting this just makes it so it prints the thought process no matter if there was a tool call or not. good for debugging.
+
+
             if "<tool_call>" in content: # this is the tool call syntax that is most used in qwen 3 for some reason. 
                 match = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", content, re.DOTALL)
                 if match:
