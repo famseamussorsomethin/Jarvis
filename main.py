@@ -39,6 +39,7 @@ def runcmd(command):
         return "success" 
     else:
         return "failed"
+
 def sendchat(history):
     return requests.post(api, json={
             "model": identifier,
@@ -48,42 +49,58 @@ def sendchat(history):
             "tool_choice": "auto"
         })
 
-def main():
+def main(micindex):
     history = [{"role": "system", "content": mainsysprompt}]
     while True:
-        userinput = input("User: ")
-        history.append({"role": "user", "content": userinput})
-        chat = sendchat(history)
-        content = chat.json()["choices"][0]["message"]["content"]
-        message = chat.json()["choices"][0]["message"]
-        #calls = message.get("tool_calls", []) or [] not needed anymore
-        if (content):
-            history.append({"role": "assistant", "content": content})
-            coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
-            coloredfullresponse += "\033[0m" # sets it back to white
+        # adding voice input
+        #userinput = input("User: ")
+        recognizer = sr.Recognizer()
+        userinput = None
+
+        with sr.Microphone(device_index=int(micindex)) as mic:
+            recognizer.adjust_for_ambient_noise(mic)
+            print("-- Jarvis LLM is listening --")
+            audio = recognizer.listen(mic)
+            try:
+                userinput = recognizer.recognize_google(audio)
+                print(f"User: {userinput}")
+            except sr.WaitTimeoutError:
+                print("timeout, mightt not have the right mic index. run micindexes.py to find the right index.")
+        recognizedaudio = recognizer.recognize_google(audio)
+        if "jarvis" in recognizedaudio.strip().lower(): # only triggers the llm if the user says "jarvis"
+            userinput = recognizedaudio.strip().lower() # stores the user input
+            history.append({"role": "user", "content": userinput})
+            chat = sendchat(history)
+            content = chat.json()["choices"][0]["message"]["content"]
+            message = chat.json()["choices"][0]["message"]
+            #calls = message.get("tool_calls", []) or [] not needed anymore
+            if (content):
+                history.append({"role": "assistant", "content": content})
+                coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
+                coloredfullresponse += "\033[0m" # sets it back to white
 
 
-            #print(coloredfullresponse) 
-            # uncommenting this just makes it so it prints the thought process no matter if there was a tool call or not. good for debugging.
+                #print(coloredfullresponse) 
+                # uncommenting this just makes it so it prints the thought process no matter if there was a tool call or not. good for debugging.
 
 
-            if "<tool_call>" in content: # this is the tool call syntax that is most used in qwen 3 for some reason. 
-                match = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", content, re.DOTALL)
-                if match:
-                    toolcalljson = json.loads(match.group(1))
-                    name = toolcalljson["name"]
-                    args = toolcalljson["arguments"]
-                    if name == "runcmd":
-                        result = runcmd(args["command"])
-                        history.append({"role": "tool", "name": "runcmd", "content": result})
-                        posttoolcallreq = sendchat(history)
-                        content = posttoolcallreq.json()["choices"][0]["message"]["content"]
-                        history.append({"role": "assistant", "content": content})
-                        coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
-                        coloredfullresponse += "\033[0m" # sets it back to white
-                        print(coloredfullresponse)
-            else:
-                print(coloredfullresponse)
+                if "<tool_call>" in content: # this is the tool call syntax that is most used in qwen 3 for some reason. 
+                    match = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", content, re.DOTALL)
+                    if match:
+                        toolcalljson = json.loads(match.group(1))
+                        name = toolcalljson["name"]
+                        args = toolcalljson["arguments"]
+                        if name == "runcmd":
+                            result = runcmd(args["command"])
+                            history.append({"role": "tool", "name": "runcmd", "content": result})
+                            posttoolcallreq = sendchat(history)
+                            content = posttoolcallreq.json()["choices"][0]["message"]["content"]
+                            history.append({"role": "assistant", "content": content})
+                            coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
+                            coloredfullresponse += "\033[0m" # sets it back to white
+                            print(coloredfullresponse)
+                else:
+                    print(coloredfullresponse)
         """    
         if (calls): 
             print("asugdiuahsd")
@@ -100,4 +117,22 @@ def main():
         # i dont mind using that so ima just ditch lm studios tool calls
 
 if __name__ == "__main__":
-    main()
+    micindex = input("mic index: ") # microphone index used for voice input. you run micindexes.py to find the right index.
+    recognizer = sr.Recognizer()
+    userinput = None
+
+    with sr.Microphone(device_index=int(micindex)) as mic:
+        recognizer.adjust_for_ambient_noise(mic, duration=0.5)
+        print("-- listening --")
+        while True: # loops it so that you can just talk normally but whenever you need the jarvis ai, you can just say "jarvis activate"
+            audio = recognizer.listen(mic)
+            try:
+                userinput = recognizer.recognize_google(audio)
+                print(f"User: {userinput}")
+            except sr.UnknownValueError:
+                print("speaching gibberish bro")
+            except sr.WaitTimeoutError:
+                print("timeout, mightt not have the right mic index. run micindexes.py to find the right index.")
+            recognizedaudio = recognizer.recognize_google(audio)
+            if "jarvis activate" in recognizedaudio.strip().lower(): 
+                main(micindex)

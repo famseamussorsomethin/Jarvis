@@ -11,7 +11,10 @@ I use Qwen3-1.7b just because it is simple, fast, and still a reasoning model wi
 
 ### Setup
 - Run the LM Studio API Server and load the model with the api identifier "qwen3" (or change the one written in the code)
-- Run main.py inside of the Jarvis folder.
+- Run pip install -r requirements.txt to install the requirements.
+- Run micindexes.py to find the right microphone index.
+- Run main.py inside of the Jarvis folder and type in the microphone index that is equivalent to your mic.
+- Say "jarvis activate" to activate the jarvis ai, and all voice commands must begin with "jarvis".
 - Have Fun! This will get more updates including hard-coded voice commands that do not use LLMs to complete the tool calls. I will try to improve this every day. Thank you for being apart of this project.
 
 #
