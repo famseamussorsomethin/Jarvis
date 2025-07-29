@@ -2,10 +2,11 @@ import requests, json, subprocess, speech_recognition as sr, re
 
 api = f"http://127.0.0.1:1234/v1/chat/completions"
 identifier = "qwen3" # the api identifier that you find in lm studio (ion know how to run it locally elsewhere. i could use ollama but ion wanna) also i love the lm studio api
-
+#            ^^^^ modifying this may ruin the syntax for tool calls. qwen 2.5 used lm studio api's tool call syntax and for some reason qwen 3 uses a different syntax.
+# i am using qwen3 1.7b (3b should work fine but i didnt really care about it being mega smart)
 mainsysprompt = (
     "You are Jarvis, a helpful assistant based on the LLM AI Model Qwen3. "
-    "You will analyze the user's prompt and decide whether to call the `landout` tool. "
+    "You will analyze the user's prompt and decide whether to call the `runcmd` tool. "
     #"If you call it, respond with an empty content plus a structured `tool_calls` array." this was before when i thought it used the qwen2.5 syntax
     "If you call it, respond with an empty message other than your tool call." 
     "Syntax should be: <tool_calls> {\"name\": \"TOOL_NAME\", \"arguments\": {\"ARGUMENT_NAME\": \"ARGUMENT_VALUE\"}} </tool_calls>" # i added this just to solidify the new syntax to make sure it doesn't switch up on me
@@ -15,7 +16,7 @@ toolcalls = [
     {
         "type": "function",
         "function": {
-            "name": "landout",
+            "name": "runcmd",
             "description": "Execute a shell command.",
             "parameters": {
                 "type": "object",
@@ -31,8 +32,8 @@ toolcalls = [
     }
 ]
 
-def landout(command):
-    print("hi")
+def runcmd(command):
+    subprocess.run(command, shell=True)
     return "success"
 
 def main():
@@ -55,16 +56,16 @@ def main():
             history.append({"role": "assistant", "content": content})
             coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
             coloredfullresponse += "\033[0m" # sets it back to white
-            print(coloredfullresponse)
+            #print(coloredfullresponse) uncommenting this just makes it so it prints the thought process no matter if there was a tool call or not. good for debugging.
             if "<tool_call>" in content: # this is the tool call syntax that is most used in qwen 3 for some reason. 
                 match = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", content, re.DOTALL)
                 if match:
                     toolcalljson = json.loads(match.group(1))
                     name = toolcalljson["name"]
                     args = toolcalljson["arguments"]
-                    if name == "landout":
-                        result = landout(args["command"])
-                        history.append({"role": "tool", "name": "landout", "content": result})
+                    if name == "runcmd":
+                        result = runcmd(args["command"])
+                        history.append({"role": "tool", "name": "runcmd", "content": result})
                         posttoolcallreq = requests.post(api, json={
                             "model": identifier,
                             "messages": history,
@@ -77,6 +78,8 @@ def main():
                         coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
                         coloredfullresponse += "\033[0m" # sets it back to white
                         print(coloredfullresponse)
+            else:
+                print(coloredfullresponse)
         """    
         if (calls): 
             print("asugdiuahsd")
