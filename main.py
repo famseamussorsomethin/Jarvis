@@ -160,7 +160,11 @@ def main(micindex):
         # but im using qwen 3 now and now it does the tool call in the text. 
         # i dont mind using that so ima just ditch lm studios tool calls
 def nonllm():
-    micindex = input("mic index: ") # microphone index used for voice input. you run micindexes.py to find the right index.
+    config = json.load(open("config.json"))
+    if config["mic_index"] == -1:
+        micindex = input("mic index: ") # microphone index used for voice input. you run micindexes.py to find the right index.
+    else:
+        micindex = config["mic_index"]
     recognizer = sr.Recognizer()
     userinput = None
 
