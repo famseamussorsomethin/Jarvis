@@ -10,8 +10,9 @@ mainsysprompt = (
     "You will analyze the user's prompt and decide whether to call the `runcmd` tool. "
     #"If you call it, respond with an empty content plus a structured `tool_calls` array." this was before when i thought it used the qwen2.5 syntax
     "If you call it, respond with an empty message other than your tool call. " 
-    "Syntax should be: <tool_calls> {\"name\": \"TOOL_NAME\", \"arguments\": {\"ARGUMENT_NAME\": \"ARGUMENT_VALUE\"}} </tool_calls> " # i added this just to solidify the new syntax to make sure it doesn't switch up on me
-    "If the tool call finished executing, report on the result of the tool call and continue the conversation. Do not say the tool call output as the user would know that since the command was ran."
+    "Syntax should ALWAYS be: <tool_call> {\"name\": \"TOOL_NAME\", \"arguments\": {\"ARGUMENT_NAME\": \"ARGUMENT_VALUE\"}} </tool_call> " # i added this just to solidify the new syntax to make sure it doesn't switch up on me
+    "If the tool call finished executing, and there is a valid success response, report on the result of the tool call and continue the conversation. Do not say the tool call output as the user would know that since the command was ran."
+    "If the user asks you to start an application, use the 'start' in cmd otherwise it will try to open it in the same command prompt where you being ran."
 )
 
 phase = "nonllm"
@@ -33,6 +34,18 @@ toolcalls = [
                 "required": ["command"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "resetmemory",
+            "description": "Reset the memory of the assistant.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
@@ -52,13 +65,17 @@ def sendchat(history):
             "tool_choice": "auto"
         })
 
+def resetmemory():
+    history = [{"role": "system", "content": mainsysprompt}]
+    return history
+
 def speak(text): # i was having issues with doing it manually every time
     tts = pyttsx3.init() # and here i just initalize a new one every speak cuz it was breaking after one tts.
     tts.say(text)
     tts.runAndWait()
     tts.stop()
 def main(micindex):
-    history = [{"role": "system", "content": mainsysprompt}]
+    history = resetmemory()
     while True:
         # adding voice input
         #userinput = input("User: ")
@@ -109,6 +126,18 @@ def main(micindex):
                             coloredfullresponse += "\033[0m" # sets it back to white
                             print(coloredfullresponse)
                             realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip() # this is the response that doesn't contain the think tag, so tts can read it outloud.
+                            speak(realresponse)
+                        if name == "resetmemory":
+                            print("Memory Reset.")
+                            history = resetmemory()
+                            history.append({"role": "tool", "name": "resetmemory", "content": "Successfully reset memory."})
+                            posttoolcallreq = sendchat(history)
+                            content = posttoolcallreq.json()["choices"][0]["message"]["content"]
+                            history.append({"role": "assistant", "content": content})
+                            coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
+                            coloredfullresponse += "\033[0m" # sets it back to white
+                            print(coloredfullresponse)
+                            realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
                             speak(realresponse)
 
                 else:
