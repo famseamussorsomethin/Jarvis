@@ -3,8 +3,6 @@ import pyttsx3 # added text to speech
 
 api = f"http://127.0.0.1:1234/v1/chat/completions"
 identifier = "qwen3" # the api identifier that you find in lm studio (ion know how to run it locally elsewhere. i could use ollama but ion wanna) also i love the lm studio api
-
-tts = pyttsx3.init()
 #            ^^^^ modifying this may ruin the syntax for tool calls. qwen 2.5 used lm studio api's tool call syntax and for some reason qwen 3 uses a different syntax.
 # i am using qwen3 1.7b (3b should work fine but i didnt really care about it being mega smart)
 mainsysprompt = (
@@ -54,6 +52,11 @@ def sendchat(history):
             "tool_choice": "auto"
         })
 
+def speak(text): # i was having issues with doing it manually every time
+    tts = pyttsx3.init() # and here i just initalize a new one every speak cuz it was breaking after one tts.
+    tts.say(text)
+    tts.runAndWait()
+    tts.stop()
 def main(micindex):
     history = [{"role": "system", "content": mainsysprompt}]
     while True:
@@ -105,14 +108,13 @@ def main(micindex):
                             coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
                             coloredfullresponse += "\033[0m" # sets it back to white
                             print(coloredfullresponse)
+                            realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip() # this is the response that doesn't contain the think tag, so tts can read it outloud.
+                            speak(realresponse)
 
                 else:
                     print(coloredfullresponse)
-                    # unified TTS for every assistant reply
-                    clean = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
-                    if clean:
-                        tts.say(clean)
-                        tts.runAndWait()
+                    realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                    speak(realresponse)
 
         """    
         if (calls): 
