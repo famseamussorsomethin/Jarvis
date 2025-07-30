@@ -16,6 +16,7 @@ mainsysprompt = (
     "If the tool call finished executing, and there is a valid success response, report on the result of the tool call and continue the conversation. Do not say the tool call output as the user would know that since the command was ran. "
     f"Right now with every prompt the user asks you, you'll remember the previous ones. If i say false right now that means you will not remember anything and if the user asks, tell them. {str(airemember)}. "
     "Do not speak in third person. Use 'I' instead of 'The assistant' or 'Jarvis'."
+    "When a user asks for a command to be ran that no other tool fits, try your best to use runcmd especially when starting applications."
 )
 
 phase = "nonllm"
@@ -25,7 +26,7 @@ toolcalls = [
         "type": "function",
         "function": {
             "name": "runcmd",
-            "description": "Execute a shell command.",
+            "description": "Execute a command prompt command.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -73,8 +74,31 @@ toolcalls = [
                 "required": []
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "type",
+            "description": "Type a string on the computer. Use this when the user mentions typing unless they specifically mention another tool",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The text to type."
+                    }
+                },
+                "required": ["text"]
+            }
+        }
+    },
 ]
+
+def type(text):
+    import pyautogui
+    pyautogui.typewrite(text)
+    print("[TOOLCALL] Typed: " + text)
+
 
 def runcmd(command):
     result = subprocess.run(command, shell=True)
@@ -151,9 +175,8 @@ def main(micindex):
                     start = content.find("<tool_call>") + len("<tool_call>") # new tool calling checking because sometimes it breaks, same syntax sent by the ai though
                     end = content.find("</tool_call>")
                     if start != -1 and end != -1:
-                        json_str = content[start:end].strip()
-                        print(f"{json_str}")
-                        toolcalljson = json.loads(json_str)
+                        jsonstrnotjson = content[start:end].strip()
+                        toolcalljson = json.loads(jsonstrnotjson)
                         name = toolcalljson["name"]
                         args = toolcalljson["arguments"]
                         if name == "runcmd":
@@ -169,7 +192,7 @@ def main(micindex):
                             realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip() # this is the response that doesn't contain the think tag, so tts can read it outloud.
                             speak(realresponse)
                         if name == "resetmemory":
-                            print("Memory Reset.")
+                            print("[TOOLCALL] Memory Reset.")
                             history = resetmemory()
                             history.append({"role": "tool", "name": "resetmemory", "content": "Successfully reset memory."})
                             posttoolcallreq = sendchat(history)
@@ -182,7 +205,7 @@ def main(micindex):
                             realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
                             speak(realresponse)
                         if name == "turnoffmemorysaving":
-                            print("Turned Off Recursive Memory Saving (also resets the memory).")
+                            print("[TOOLCALL] Turned Off Recursive Memory Saving (also resets the memory).")
                             turnoffmemorysaving()
                             history.append({"role": "tool", "name": "turnoffmemorysaving", "content": "Successfully turned off recursive memory. After your next prompt the memory will be reset."})
                             posttoolcallreq = sendchat(history)
@@ -195,13 +218,24 @@ def main(micindex):
                             speak(realresponse)
                             history = resetmemory()
                         if name == "turnonmemorysaving":
-                            print("Turned On Recursive Memory Saving (also resets the memory).")
+                            print("[TOOLCALL] Turned On Recursive Memory Saving (also resets the memory).")
                             history = resetmemory()
                             turnonmemorysaving()
                             history.append({"role": "tool", "name": "turnonmemorysaving", "content": "Successfully turned on recursive memory. Report on the success"}) # report cuz sometimes it tries to recall the tool.
                             posttoolcallreq = sendchat(history)
                             content = posttoolcallreq.json()["choices"][0]["message"]["content"]
                             history.append({"role": "assistant", "content": content}) # keep this remembering so that it wont just say "Recursive memory is off" over and over.
+                            coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
+                            coloredfullresponse += "\033[0m" # sets it back to white
+                            print(coloredfullresponse)
+                            realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                            speak(realresponse)
+                        if name == "type":
+                            type(args["text"])
+                            history.append({"role": "tool", "name": "type", "content": "Successfully typed the text."})
+                            posttoolcallreq = sendchat(history)
+                            content = posttoolcallreq.json()["choices"][0]["message"]["content"]
+                            history.append({"role": "assistant", "content": content})
                             coloredfullresponse = re.sub(r'<think>(.*?)<\/think>', lambda m: "\033[91m" + m.group(1).strip() + "\033[92m", content, flags=re.DOTALL) # 91 is red, 92 is green
                             coloredfullresponse += "\033[0m" # sets it back to white
                             print(coloredfullresponse)
