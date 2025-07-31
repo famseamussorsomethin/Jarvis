@@ -9,6 +9,8 @@ identifier = "qwen3" # the api identifier that you find in lm studio (ion know h
 airemember = True
 Running = False # so i can use it to check if the llm is running or not for the turnoff tool
 phase = "nonllm"
+micindex = -1
+config = json.load(open("config.json"))
 
 mainsysprompt = (
     "You are Jarvis, a helpful assistant based on the LLM AI Model Qwen3. "
@@ -152,27 +154,32 @@ def llm(micindex):
     Running = True
     global airemember
     global phase
+    global config
     phase = "llm"
     history = resetmemory()
     while Running:
         # adding voice input
         #userinput = input("User: ")
-        recognizer = sr.Recognizer()
-        userinput = None
-        with sr.Microphone(device_index=int(micindex)) as mic:
-            recognizer.adjust_for_ambient_noise(mic)
+        if config["microphone"] == True:
+            recognizer = sr.Recognizer()
+            userinput = None
+            with sr.Microphone(device_index=int(micindex)) as mic:
+                recognizer.adjust_for_ambient_noise(mic)
+                print("-- Jarvis LLM is listening --")
+                audio = recognizer.listen(mic)
+                try:
+                    userinput = recognizer.recognize_google(audio)
+                    print(f"User: {userinput}")
+                except sr.UnknownValueError:
+                    continue
+                except sr.WaitTimeoutError:
+                    print("timeout, might not have the right mic index or no speech detected, retrying.")
+                    continue
+        else:
             print("-- Jarvis LLM is listening --")
-            audio = recognizer.listen(mic)
-            try:
-                userinput = recognizer.recognize_google(audio)
-                print(f"User: {userinput}")
-            except sr.UnknownValueError:
-                continue
-            except sr.WaitTimeoutError:
-                print("timeout, might not have the right mic index or no speech detected, retrying.")
-                continue
+            userinput = input("User: ")
         if "jarvis" in userinput.strip().lower(): # only triggers the llm if the user says "jarvis"
-            userinput = userinput.strip().lower() # stores the user input
+            userinput = userinput.strip().lower() # makes it lowercase
             history.append({"role": "user", "content": userinput})
             chat = sendchat(history)
             content = chat.json()["choices"][0]["message"]["content"]
@@ -291,38 +298,47 @@ def nonllm():
     Running = True
     global phase
     phase = "nonllm"
-    config = json.load(open("config.json"))
+    global config
+    global micindex
     if config["mic_index"] == -1:
         micindex = input("mic index: ") # microphone index used for voice input. you run micindexes.py to find the right index.
     else:
         micindex = config["mic_index"]
-    recognizer = sr.Recognizer()
-
-    with sr.Microphone(device_index=int(micindex)) as mic:
-        recognizer.adjust_for_ambient_noise(mic, duration=0.5)
-        print("-- listening --")
-        while Running: # loops it so that you can just talk normally but whenever you need the jarvis ai, you can just say "jarvis activate"
-            audio = recognizer.listen(mic)
-            try:
-                userinput = recognizer.recognize_google(audio)
-                print(f"User: {userinput}")
-            except sr.UnknownValueError:
-                continue
-            except sr.WaitTimeoutError:
-                print("timeout, might not have the right mic index or no speech detected, retrying.")
-                continue
+    if config["microphone"] == True:
+        recognizer = sr.Recognizer()
+        with sr.Microphone(device_index=int(micindex)) as mic:
+            recognizer.adjust_for_ambient_noise(mic, duration=0.5)
+            print("-- listening --")
+            while Running: # loops it so that you can just talk normally but whenever you need the jarvis ai, you can just say "jarvis activate"
+                audio = recognizer.listen(mic)
+                try:
+                    userinput = recognizer.recognize_google(audio)
+                    print(f"User: {userinput}")
+                except sr.UnknownValueError:
+                    continue
+                except sr.WaitTimeoutError:
+                    print("timeout, might not have the right mic index or no speech detected, retrying.")
+                    continue
+                if "jarvis activate" in userinput.strip().lower():
+                    phase = "llm" 
+                    llm(micindex)
+    else:
+        while Running:
+            print("-- listening --")
+            userinput = input("User: ")
             if "jarvis activate" in userinput.strip().lower():
-                phase = "llm" 
+                phase = "llm"
                 llm(micindex)
 def main():
     global Running
     Running = False
     global phase
+    global micindex
 
     if phase == "nonllm":
         nonllm()
     elif phase == "llm":
-        llm()
+        llm(micindex)
 
 if __name__ == "__main__":
     main()

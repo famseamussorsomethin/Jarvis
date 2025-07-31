@@ -1,3 +1,4 @@
 {
-    "mic_index": 9
+    "mic_index": -1,
+    "microphone": true
 }
