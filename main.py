@@ -7,6 +7,9 @@ identifier = "qwen3" # the api identifier that you find in lm studio (ion know h
 # i am using qwen3 1.7b (3b should work fine but i didnt really care about it being mega smart)
 
 airemember = True
+Running = False # so i can use it to check if the llm is running or not for the turnoff tool
+phase = "nonllm"
+
 mainsysprompt = (
     "You are Jarvis, a helpful assistant based on the LLM AI Model Qwen3. "
     "You will analyze the user's prompt and decide whether to call the `runcmd` tool. "
@@ -19,7 +22,6 @@ mainsysprompt = (
     "When a user asks for a command to be ran that no other tool fits, try your best to use runcmd especially when starting applications."
 )
 
-phase = "nonllm"
 
 toolcalls = [
     {
@@ -92,6 +94,18 @@ toolcalls = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "turnoff",
+            "description": "Goes back into the non llm stage of Jarvis. You can always reactivate jarvis by saying 'jarvis activate'. The memory will be reset if you activate him again.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    }
 ]
 
 def type(text):
@@ -133,10 +147,14 @@ def speak(text): # i was having issues with doing it manually every time
     tts.say(text)
     tts.runAndWait()
     tts.stop()
-def main(micindex):
+def llm(micindex):
+    global Running
+    Running = True
     global airemember
+    global phase
+    phase = "llm"
     history = resetmemory()
-    while True:
+    while Running:
         # adding voice input
         #userinput = input("User: ")
         recognizer = sr.Recognizer()
@@ -241,6 +259,13 @@ def main(micindex):
                             print(coloredfullresponse)
                             realresponse = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
                             speak(realresponse)
+                        if name == "turnoff":
+                            turnofftext = "[TOOLCALL] Turned Off Jarvis LLM Mode (you can always reactivate him by saying 'jarvis activate')."
+                            print(turnofftext)
+                            speak(turnofftext)
+                            Running = False
+                            phase = "nonllm"
+                            main()
 
                 else:
                     print(coloredfullresponse)
@@ -262,6 +287,10 @@ def main(micindex):
         # but im using qwen 3 now and now it does the tool call in the text. 
         # i dont mind using that so ima just ditch lm studios tool calls
 def nonllm():
+    global Running
+    Running = True
+    global phase
+    phase = "nonllm"
     config = json.load(open("config.json"))
     if config["mic_index"] == -1:
         micindex = input("mic index: ") # microphone index used for voice input. you run micindexes.py to find the right index.
@@ -272,7 +301,7 @@ def nonllm():
     with sr.Microphone(device_index=int(micindex)) as mic:
         recognizer.adjust_for_ambient_noise(mic, duration=0.5)
         print("-- listening --")
-        while True: # loops it so that you can just talk normally but whenever you need the jarvis ai, you can just say "jarvis activate"
+        while Running: # loops it so that you can just talk normally but whenever you need the jarvis ai, you can just say "jarvis activate"
             audio = recognizer.listen(mic)
             try:
                 userinput = recognizer.recognize_google(audio)
@@ -284,7 +313,16 @@ def nonllm():
                 continue
             if "jarvis activate" in userinput.strip().lower():
                 phase = "llm" 
-                main(micindex)
+                llm(micindex)
+def main():
+    global Running
+    Running = False
+    global phase
+
+    if phase == "nonllm":
+        nonllm()
+    elif phase == "llm":
+        llm()
 
 if __name__ == "__main__":
-    nonllm()
+    main()
